@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASTRA – Space Mission Explorer | Planetary Simulation & Data Analysis</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300f0ff' stroke-width='2'><circle cx='12' cy='12' r='10'/><path d='m4.93 4.93 4.24 4.24'/><circle cx='12' cy='12' r='4'/></svg>" />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+  <!-- Three.js (Lightweight 3D WebGL Library via CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Mission Control Bar -->
+    <header class="glass-header">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#00f0ff,#3b82f6); display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(0,240,255,0.4);">
+          <span style="font-size:18px;">🚀</span>
+        </div>
+        <div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-weight:800; font-size:16px; letter-spacing:1px; color:#fff;">ASTRA</span>
+            <span class="pill pill-cyan" style="padding:1px 6px; font-size:10px;">EXPLORER LITE</span>
+          </div>
+          <div style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted);">
+            ISRO Planetary Simulation & Telemetry Center
+          </div>
+        </div>
+        <div class="pill pill-cyan" id="dataSourceBadge" style="margin-left:10px;">
+          <span class="ping-dot" style="background:#00f0ff;"></span>
+          <span id="dataSourceText">SIMULATED TELEMETRY</span>
+        </div>
+      </div>
+
+      <!-- Center Selectors: Spacecraft & Celestial Target -->
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+        <!-- Spacecraft Switcher -->
+        <div style="display:flex; align-items:center; background:var(--bg-space-900); padding:3px; border-radius:8px; border:1px solid var(--panel-border);">
+          <span style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); padding:0 8px;">CRAFT:</span>
+          <button class="btn btn-secondary active" id="btnCraftChandrayaan" onclick="switchSpacecraft('chandrayaan')">Chandrayaan-3</button>
+          <button class="btn btn-secondary" id="btnCraftMangalyaan" onclick="switchSpacecraft('mangalyaan')">Mangalyaan</button>
+          <button class="btn btn-secondary" id="btnCraftAditya" onclick="switchSpacecraft('aditya-l1')">Aditya-L1</button>
+        </div>
+
+        <!-- Celestial Body Switcher -->
+        <div style="display:flex; align-items:center; background:var(--bg-space-900); padding:3px; border-radius:8px; border:1px solid var(--panel-border);">
+          <span style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); padding:0 8px;">TARGET:</span>
+          <button class="btn btn-secondary active" id="btnTargetMoon" onclick="switchCelestialBody('moon')">Moon</button>
+          <button class="btn btn-secondary" id="btnTargetMars" onclick="switchCelestialBody('mars')">Mars</button>
+          <button class="btn btn-secondary" id="btnTargetSun" onclick="switchCelestialBody('sun')">Sun</button>
+        </div>
+      </div>
+
+      <!-- Right Controls: Simulation Engine & Audio -->
+      <div style="display:flex; align-items:center; gap:10px;">
+        <!-- Clocks -->
+        <div style="text-align:right; font-family:var(--font-mono); font-size:11px; line-height:1.2;">
+          <div id="clockIST" style="color:#fff; font-weight:700;">--:--:-- IST</div>
+          <div id="clockMET" style="color:var(--text-muted); font-size:10px;">T+00d 00:00:00</div>
+        </div>
+
+        <!-- Simulation Controls -->
+        <div style="display:flex; align-items:center; background:var(--bg-space-900); padding:3px; border-radius:8px; border:1px solid var(--panel-border); gap:4px;">
+          <button class="btn btn-primary" id="btnPlayPause" onclick="togglePlayPause()">
+            <span id="playIcon">⏸ PAUSE</span>
+          </button>
+          <button class="btn btn-secondary" title="Reset Simulation" onclick="resetSimulation()">↺</button>
+          <button class="btn btn-secondary" id="btnSpeed1" onclick="setSpeed(1)">1x</button>
+          <button class="btn btn-secondary" id="btnSpeed2" onclick="setSpeed(2)">2x</button>
+          <button class="btn btn-secondary" id="btnSpeed5" onclick="setSpeed(5)">5x</button>
+        </div>
+
+        <!-- Audio Synthesizer Toggle -->
+        <button class="viewport-btn active" id="btnAudioToggle" title="Toggle Telemetry Audio Synthesizer" onclick="toggleAudio()">
+          🔊
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Layout: Sidebar Navigation + Workspace -->
+    <div class="main-layout">
+      <!-- Sidebar Navigation -->
+      <aside class="sidebar">
+        <div>
+          <div style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; padding:0 4px;">
+            Workspaces
+          </div>
+          <div class="nav-tabs">
+            <button class="nav-tab-btn active" id="tabBtnOverview" onclick="switchTab('overview')">
+              <span>🚀</span>
+              <span>Mission Control</span>
+            </button>
+            <button class="nav-tab-btn" id="tabBtnSensors" onclick="switchTab('sensors')">
+              <span>🛰️</span>
+              <span>Sensor Dashboard</span>
+              <span class="tab-badge pill-emerald" id="sensorAlertBadge">ACTIVE</span>
+            </button>
+            <button class="nav-tab-btn" id="tabBtnLunar" onclick="switchTab('lunar')">
+              <span>🌕</span>
+              <span>Lunar Data Analysis</span>
+              <span class="tab-badge pill-cyan">CHANDRAYAAN</span>
+            </button>
+            <button class="nav-tab-btn" id="tabBtnTelemetry" onclick="switchTab('telemetry')">
+              <span>📥</span>
+              <span>Data Input & Upload</span>
+            </button>
+            <button class="nav-tab-btn" id="tabBtnAnalytics" onclick="switchTab('analytics')">
+              <span>📊</span>
+              <span>Flight Logs & Export</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Deep Space Network (DSN) Status Widget -->
+        <div style="background:var(--bg-space-950); border:1px solid var(--panel-border); border-radius:10px; padding:12px; margin-top:20px; font-family:var(--font-mono); font-size:11px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(56,189,248,0.2); padding-bottom:6px; margin-bottom:6px;">
+            <span style="color:var(--text-main); font-weight:700;">📡 DSN LINK</span>
+            <span class="ping-dot" style="background:#10b981;"></span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+            <span style="color:var(--text-muted);">Station:</span>
+            <span style="color:#fff;">Bengaluru (32m)</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+            <span style="color:var(--text-muted);">Uplink:</span>
+            <span style="color:var(--astra-blue);">2.1 GHz S-Band</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--text-muted);">Signal SNR:</span>
+            <span style="color:var(--astra-cyan);" id="dsnSnrText">-103.5 dBm</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Dynamic Workspace View -->
+      <main class="main-content">
+        <!-- ============================================== -->
+        <!-- VIEW 1: MISSION CONTROL (Cockpit & 3D Viewport) -->
+        <!-- ============================================== -->
+        <section id="viewOverview" style="display:flex; flex-direction:column; gap:20px;">
+          <!-- Top KPI Telemetry Strip -->
+          <div class="grid-kpi">
+            <div class="kpi-card">
+              <div class="kpi-label">Active Mission <span class="ping-dot" style="background:#00f0ff;"></span></div>
+              <div class="kpi-value" id="kpiMissionName">Chandrayaan-3</div>
+              <div class="kpi-sub" id="kpiAgency">ISRO • Lunar Polar</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Target Body <span>🪐</span></div>
+              <div class="kpi-value" id="kpiTargetName">Moon</div>
+              <div class="kpi-sub" id="kpiTargetRadius">Radius: 1,737 km</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Spacecraft Alt <span>🧭</span></div>
+              <div class="kpi-value" style="color:var(--astra-cyan);"><span id="kpiAltitude">100.0</span> <span style="font-size:12px;">km</span></div>
+              <div class="kpi-sub" id="kpiVelocity">Vel: 1.63 km/s</div>
+            </div>
+            <div class="kpi-card" id="kpiTempCard">
+              <div class="kpi-label">Thermistor <span>🌡️</span></div>
+              <div class="kpi-value" id="kpiTempValue" style="color:var(--astra-amber);"><span id="kpiTemp">+24.5</span> <span style="font-size:12px;">°C</span></div>
+              <div class="kpi-sub" id="kpiTempStatus">Nominal Corridor</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Radar Echo <span>📻</span></div>
+              <div class="kpi-value" style="color:var(--astra-blue);"><span id="kpiRadar">99.8</span> <span style="font-size:12px;">km</span></div>
+              <div class="kpi-sub">Dual Frequency S/L</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Laser LiDAR <span>🎯</span></div>
+              <div class="kpi-value" style="color:var(--astra-emerald);"><span id="kpiLidar">99,820</span> <span style="font-size:12px;">m</span></div>
+              <div class="kpi-sub">50 Hz Time-of-Flight</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Observations <span>📊</span></div>
+              <div class="kpi-value" style="color:var(--astra-purple);"><span id="kpiObsCount">24</span> <span style="font-size:12px;">pts</span></div>
+              <div class="kpi-sub" id="kpiDataClass">Calibrated Log</div>
+            </div>
+          </div>
+
+          <!-- 3D Realistic Viewport & Controls -->
+          <div class="viewport-container" id="viewportContainer">
+            <div id="canvasMount" class="viewport-canvas"></div>
+
+            <!-- Top HUD -->
+            <div class="viewport-hud-top">
+              <div class="pill pill-cyan">
+                <span class="ping-dot" style="background:#00f0ff;"></span>
+                <span>3D REALISTIC ORBITAL SIMULATOR</span>
+              </div>
+              <div class="pill pill-cyan" id="hudFocusPill">
+                FOCUS: <span id="hudFocusText" style="font-weight:700; color:#fff; margin-left:4px;">Full Planet Disc</span>
+              </div>
+            </div>
+
+            <!-- Bottom Coordinates HUD -->
+            <div class="viewport-hud-coords">
+              <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px;">Nadir Sub-Satellite Point</div>
+              <div style="display:flex; gap:12px;">
+                <div>LAT: <span style="color:var(--astra-cyan); font-weight:700;" id="hudLat">-69.37°</span></div>
+                <div>LON: <span style="color:var(--astra-cyan); font-weight:700;" id="hudLon">+32.32°</span></div>
+                <div>ALT: <span style="color:var(--astra-emerald); font-weight:700;" id="hudAlt">100 km</span></div>
+              </div>
+            </div>
+
+            <!-- Quick Fly-To Feature Presets -->
+            <div class="viewport-flyto-bar" id="viewportFlytoBar">
+              <span style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted); text-transform:uppercase;">Fly To:</span>
+              <div id="flyToButtonsContainer" style="display:flex; gap:6px;"></div>
+            </div>
+
+            <!-- Floating Viewport Controls -->
+            <div class="viewport-controls-right">
+              <button class="viewport-btn" title="Reset View" onclick="reset3DView()">↺</button>
+              <button class="viewport-btn" title="Zoom In (+)" onclick="zoomIn3D()">➕</button>
+              <button class="viewport-btn" title="Zoom Out (-)" onclick="zoomOut3D()">➖</button>
+              <button class="viewport-btn" id="btnInteractionMode" title="Switch Pan / Rotate Drag Mode" onclick="togglePanRotate()">✋</button>
+              <button class="viewport-btn" id="btnFollowCraft" title="Lock & Follow Spacecraft" onclick="toggleFollowCraft()">🎯</button>
+              <button class="viewport-btn active" id="btnToggleOrbit" title="Toggle Orbit Path" onclick="toggleOrbitLine()">⭕</button>
+              <button class="viewport-btn active" id="btnToggleBeam" title="Toggle Sensor Beam" onclick="toggleSensorBeam()">📡</button>
+              <button class="viewport-btn active" id="btnToggleLight" title="Toggle Terminator Lighting" onclick="toggleLighting()">☀️</button>
+            </div>
+          </div>
+
+          <!-- Mission Specs & Subsystems Status -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+            <!-- Mission Profile -->
+            <div class="glass-panel" style="padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(56,189,248,0.2); padding-bottom:8px; margin-bottom:12px;">
+                <span style="font-weight:700; font-size:13px; font-family:var(--font-mono); color:var(--astra-cyan);">MISSION PROFILE & OBJECTIVES</span>
+                <span class="pill pill-cyan" id="specStatus">ACTIVE</span>
+              </div>
+              <p style="font-size:13px; color:var(--text-main); margin-bottom:12px; line-height:1.6;" id="specDesc">
+                India's flagship lunar mission accomplished historic precision soft landing near the Lunar South Pole (Shiv Shakti Point).
+              </p>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-family:var(--font-mono); font-size:12px; background:rgba(6,13,31,0.6); padding:10px; border-radius:8px; border:1px solid var(--panel-border);">
+                <div>Nominal Alt: <span style="color:#fff; font-weight:700;" id="specNominalAlt">100 km</span></div>
+                <div>Inclination: <span style="color:#fff; font-weight:700;" id="specNominalInc">89.8°</span></div>
+                <div>Orbit Period: <span style="color:#fff; font-weight:700;" id="specPeriod">118 min</span></div>
+                <div>Launch Vehicle: <span style="color:#fff; font-weight:700;" id="specVehicle">LVM3-M4</span></div>
+              </div>
+            </div>
+
+            <!-- Spacecraft Bus Subsystems -->
+            <div class="glass-panel" style="padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(56,189,248,0.2); padding-bottom:8px; margin-bottom:12px;">
+                <span style="font-weight:700; font-size:13px; font-family:var(--font-mono); color:var(--text-main);">SPACECRAFT BUS SUBSYSTEMS</span>
+                <span style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted);">Real-time Telemetry</span>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div style="background:rgba(6,13,31,0.7); padding:10px; border-radius:8px; border:1px solid var(--panel-border);">
+                  <div style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted);">Solar Power Array</div>
+                  <div style="font-size:20px; font-weight:700; font-family:var(--font-mono); color:var(--astra-amber); margin:4px 0;"><span id="busPower">224</span> W</div>
+                  <div style="font-size:10px; font-family:var(--font-mono); color:var(--astra-emerald);">Battery SoC: 98.4%</div>
+                </div>
+                <div style="background:rgba(6,13,31,0.7); padding:10px; border-radius:8px; border:1px solid var(--panel-border);">
+                  <div style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted);">DSN Carrier Signal</div>
+                  <div style="font-size:20px; font-weight:700; font-family:var(--font-mono); color:var(--astra-cyan); margin:4px 0;"><span id="busSignal">-103.5</span> dBm</div>
+                  <div style="font-size:10px; font-family:var(--font-mono); color:var(--astra-emerald);">Lock: Solid (99.8%)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Real-Time Flight Telemetry Graphs Strip -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:20px;">
+            <div class="glass-panel" style="padding:16px;">
+              <div style="font-size:12px; font-weight:700; font-family:var(--font-mono); color:var(--astra-cyan); margin-bottom:8px;">
+                📈 Altitude vs Radar Profile (km)
+              </div>
+              <div class="chart-box">
+                <canvas id="chartAltitude" class="chart-canvas"></canvas>
+              </div>
+            </div>
+            <div class="glass-panel" style="padding:16px;">
+              <div style="font-size:12px; font-weight:700; font-family:var(--font-mono); color:var(--astra-amber); margin-bottom:8px;">
+                🌡️ Thermistor Temperature Variation (°C)
+              </div>
+              <div class="chart-box">
+                <canvas id="chartTemperature" class="chart-canvas"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- VIEW 2: SENSOR DASHBOARD -->
+        <!-- ============================================== -->
+        <section id="viewSensors" style="display:none; flex-direction:column; gap:20px;">
+          <!-- Sensor Anomaly Alert Banner -->
+          <div id="sensorAlertBanner" style="display:none; padding:12px 16px; border-radius:10px; background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.6); color:#fca5a5; font-family:var(--font-mono); font-size:12px;">
+            ⚠️ <b>CRITICAL THERMAL EXCURSION ALERT:</b> Temperature reading exceeds safe operating envelope corridor! Autonomous radiators & heaters engaged.
+          </div>
+
+          <!-- 1. Thermistor Panel -->
+          <div class="glass-panel" style="padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(56,189,248,0.2); padding-bottom:10px; margin-bottom:16px;">
+              <div>
+                <h3 style="font-size:16px; font-weight:700; color:#fff;">Temperature Sensor – Thermistor (RTD PT-1000)</h3>
+                <p style="font-size:12px; color:var(--text-muted);">Spacecraft & Payload Thermophysical Monitoring</p>
+              </div>
+              <span class="pill pill-emerald" id="sensorThermStatus">NOMINAL CORRIDOR</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+              <div class="kpi-card">
+                <div class="kpi-label">Core Temperature</div>
+                <div class="kpi-value" style="color:var(--astra-cyan); font-size:24px;" id="sensCoreTemp">+24.5 °C</div>
+                <div class="kpi-sub" id="sensKelvin">297.6 K</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Safe Flight Limits</div>
+                <div class="kpi-value" style="font-size:16px;" id="sensSafeLimits">-120°C to +85°C</div>
+                <div class="kpi-sub">Design Envelope</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">NTC Resistance</div>
+                <div class="kpi-value" style="color:var(--astra-purple); font-size:18px;" id="sensResistance">9.85 kΩ</div>
+                <div class="kpi-sub">Steinhart-Hart Curve</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Illumination Mode</div>
+                <div class="kpi-value" style="color:var(--astra-amber); font-size:16px;" id="sensIllumination">Sunlit Orbit</div>
+                <div class="kpi-sub" id="sensFlux">Flux: 1361 W/m²</div>
+              </div>
+            </div>
+            <div class="chart-box" style="height:220px;">
+              <canvas id="chartSensorThermistor" class="chart-canvas"></canvas>
+            </div>
+          </div>
+
+          <!-- 2. Radar Altimeter & SAR -->
+          <div class="glass-panel" style="padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(56,189,248,0.2); padding-bottom:10px; margin-bottom:16px;">
+              <div>
+                <h3 style="font-size:16px; font-weight:700; color:#fff;">Dual-Frequency Synthetic Aperture Radar (SAR) & Altimeter</h3>
+                <p style="font-size:12px; color:var(--text-muted);">Active microwave pulse sounding & surface dielectric profiling</p>
+              </div>
+              <span class="pill pill-cyan">TRANSMITTING PULSES</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+              <div class="kpi-card">
+                <div class="kpi-label">Radar Slant Range</div>
+                <div class="kpi-value" style="color:var(--astra-blue); font-size:24px;" id="sensRadarRange">99.8 km</div>
+                <div class="kpi-sub">Accuracy: ±0.45m</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Two-Way Echo Delay</div>
+                <div class="kpi-value" style="color:var(--astra-cyan); font-size:18px;" id="sensEchoDelay">0.666 ms</div>
+                <div class="kpi-sub">c = 299,792 km/s</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Relative Permittivity</div>
+                <div class="kpi-value" style="color:var(--astra-purple); font-size:18px;" id="sensDielectric">3.2 εr</div>
+                <div class="kpi-sub">Subsurface Pen: ~2.5m</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Surface Classification</div>
+                <div class="kpi-value" style="font-size:14px;" id="sensClassification">Highland Regolith</div>
+                <div class="kpi-sub">Roughness: Moderate</div>
+              </div>
+            </div>
+            <div class="chart-box" style="height:220px;">
+              <canvas id="chartSensorRadar" class="chart-canvas"></canvas>
+            </div>
+          </div>
+
+          <!-- 3. Laser LiDAR LASA -->
+          <div class="glass-panel" style="padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(56,189,248,0.2); padding-bottom:10px; margin-bottom:16px;">
+              <div>
+                <h3 style="font-size:16px; font-weight:700; color:#fff;">Laser Altimeter & Surface LiDAR (LASA)</h3>
+                <p style="font-size:12px; color:var(--text-muted);">50 Hz Nd:YAG 1064nm laser time-of-flight ranging & 2D surface topography</p>
+              </div>
+              <span class="pill pill-emerald">LASER ACTIVE (50 Hz)</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+              <div class="kpi-card">
+                <div class="kpi-label">Laser Slant Range</div>
+                <div class="kpi-value" style="color:var(--astra-emerald); font-size:24px;" id="sensLidarRange">99,820 m</div>
+                <div class="kpi-sub">Resolution: ±5 cm</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Surface Elevation</div>
+                <div class="kpi-value" style="color:var(--astra-cyan); font-size:20px;" id="sensSurfaceElev">+180 m</div>
+                <div class="kpi-sub">vs Reference Geoid</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Repetition Rate</div>
+                <div class="kpi-value" style="color:var(--astra-amber); font-size:18px;">50.0 Hz</div>
+                <div class="kpi-sub">Pulse Energy: 10 mJ</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Footprint Diameter</div>
+                <div class="kpi-value" style="font-size:18px;">9.9 m</div>
+                <div class="kpi-sub">Divergence: 0.1 mrad</div>
+              </div>
+            </div>
+            <div class="chart-box" style="height:220px;">
+              <canvas id="chartSensorLidar" class="chart-canvas"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- VIEW 3: CHANDRAYAAN LUNAR DATA ANALYSIS -->
+        <!-- ============================================== -->
+        <section id="viewLunar" style="display:none; flex-direction:column; gap:20px;">
+          <!-- Banner -->
+          <div class="glass-panel" style="padding:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <h2 style="font-size:18px; font-weight:800; color:#fff;">Chandrayaan Lunar Surface & Crater Data Analysis</h2>
+              <p style="font-size:12px; color:var(--text-muted);">Calibrated ISRO TMC-2, ChaSTE in-situ probe & DFSAR polarimetric data</p>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <label class="btn btn-secondary" style="cursor:pointer;">
+                📁 Ingest Public Lunar CSV
+                <input type="file" accept=".csv" onchange="uploadLunarCsv(event)" style="display:none;" />
+              </label>
+              <button class="btn btn-primary" onclick="resetLunarData()">Reset ISRO Baseline</button>
+            </div>
+          </div>
+
+          <!-- 2D Map & ChaSTE Profile -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:20px;">
+            <!-- 2D Lunar Map -->
+            <div class="glass-panel" style="padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:700; font-family:var(--font-mono); color:var(--astra-cyan);">2D LUNAR OBSERVATION MAP</span>
+                <div style="display:flex; gap:4px;">
+                  <button class="btn btn-secondary" id="layerBtnElev" onclick="setLunarLayer('elevation')">DEM</button>
+                  <button class="btn btn-secondary" id="layerBtnTherm" onclick="setLunarLayer('thermal')">Thermal</button>
+                  <button class="btn btn-secondary" id="layerBtnIce" onclick="setLunarLayer('ice')">Ice (PSRs)</button>
+                </div>
+              </div>
+              <div style="height:280px; position:relative; background:#020617; border-radius:8px; border:1px solid var(--panel-border); overflow:hidden;">
+                <canvas id="lunarMapCanvas" style="width:100%; height:100%; cursor:crosshair;"></canvas>
+              </div>
+              <div style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); margin-top:8px;" id="lunarMapHoverText">
+                Hover or click any observation point to inspect details
+              </div>
+            </div>
+
+            <!-- ChaSTE Subsurface Probe Profile -->
+            <div class="glass-panel" style="padding:16px;">
+              <div style="font-size:13px; font-weight:700; font-family:var(--font-mono); color:var(--astra-amber); margin-bottom:8px;">
+                ChaSTE In-Situ Subsurface Thermal Gradient (0cm down to -10cm)
+              </div>
+              <div class="chart-box" style="height:280px;">
+                <canvas id="chartChaste" class="chart-canvas"></canvas>
+              </div>
+              <p style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); margin-top:8px;">
+                <b>Historic ISRO Discovery:</b> Surface reached ~+45°C during sunlit periods, while just 8-10 cm deep into regolith the temperature dropped below -50°C!
+              </p>
+            </div>
+          </div>
+
+          <!-- Crater Catalog Explorer & Topographic Profiles -->
+          <div class="glass-panel" style="padding:16px;">
+            <div style="font-size:14px; font-weight:700; font-family:var(--font-mono); color:#fff; margin-bottom:12px;">
+              LUNAR CRATER CATALOG & TOPOGRAPHIC PROFILES
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+              <div style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;" id="craterListContainer"></div>
+              <div>
+                <div style="font-size:12px; font-family:var(--font-mono); color:var(--astra-cyan); margin-bottom:6px;" id="selectedCraterTitle">
+                  Rim-to-Floor Topographic Cross-Section (Shiv Shakti Point)
+                </div>
+                <div class="chart-box" style="height:190px;">
+                  <canvas id="chartCraterProfile" class="chart-canvas"></canvas>
+                </div>
+                <div style="font-size:11px; font-family:var(--font-mono); color:var(--text-main); margin-top:6px;" id="selectedCraterDesc"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- VIEW 4: DATA INPUT & CSV UPLOAD -->
+        <!-- ============================================== -->
+        <section id="viewTelemetry" style="display:none; flex-direction:column; gap:20px;">
+          <div class="glass-panel" style="padding:20px;">
+            <h3 style="font-size:16px; font-weight:700; color:#fff; margin-bottom:16px;">
+              Manual Telemetry Ingestion & Real-Time Controller
+            </h3>
+            <form onsubmit="handleManualInputSubmit(event)" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
+              <div>
+                <label style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); display:block; margin-bottom:4px;">Spacecraft Altitude (km)</label>
+                <input type="number" step="0.1" class="form-input" id="inAltitude" value="100.0" required />
+              </div>
+              <div>
+                <label style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); display:block; margin-bottom:4px;">Sub-Satellite Latitude (°)</label>
+                <input type="number" step="0.01" min="-90" max="90" class="form-input" id="inLatitude" value="-69.37" required />
+              </div>
+              <div>
+                <label style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); display:block; margin-bottom:4px;">Sub-Satellite Longitude (°)</label>
+                <input type="number" step="0.01" min="-180" max="180" class="form-input" id="inLongitude" value="32.32" required />
+              </div>
+              <div>
+                <label style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); display:block; margin-bottom:4px;">Core Temperature (°C)</label>
+                <input type="number" step="0.1" class="form-input" id="inTemperature" value="25.0" required />
+              </div>
+              <div>
+                <label style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); display:block; margin-bottom:4px;">Radar Measurement (km)</label>
+                <input type="number" step="0.1" class="form-input" id="inRadar" value="99.8" required />
+              </div>
+              <div>
+                <label style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); display:block; margin-bottom:4px;">LiDAR Distance (m)</label>
+                <input type="number" step="1" class="form-input" id="inLidar" value="99820" required />
+              </div>
+              <div>
+                <label style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); display:block; margin-bottom:4px;">Signal Strength (dBm)</label>
+                <input type="number" step="0.1" class="form-input" id="inSignal" value="-103.5" required />
+              </div>
+              <div>
+                <label style="font-size:11px; font-family:var(--font-mono); color:var(--text-muted); display:block; margin-bottom:4px;">Observation Timestamp</label>
+                <input type="text" class="form-input" id="inTimestamp" value="2026-11-22T04:00:00Z" required />
+              </div>
+              <div style="grid-column:1 / -1; display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+                <button type="submit" class="btn btn-primary" style="padding:10px 24px; font-size:13px;">
+                  ▶ Run Simulation With Entered Data
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- CSV Upload & Preloaded Samples -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+            <div class="glass-panel" style="padding:20px;">
+              <h4 style="font-size:14px; font-weight:700; color:#fff; margin-bottom:8px;">Upload Scientific Observation CSV</h4>
+              <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Supports ISRO TMC, ChaSTE, DFSAR, and MOM CSV telemetry schemas.</p>
+              <input type="file" accept=".csv" onchange="handleTelemetryCsvUpload(event)" class="form-input" style="padding:12px;" />
+            </div>
+            <div class="glass-panel" style="padding:20px;">
+              <h4 style="font-size:14px; font-weight:700; color:#fff; margin-bottom:8px;">Quick-Load Authentic Sample Datasets</h4>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <button class="btn btn-secondary" onclick="loadSampleDataset('chandrayaan')">📄 Load Chandrayaan-3 Lunar Polar Pass (12 records)</button>
+                <button class="btn btn-secondary" onclick="loadSampleDataset('mangalyaan')">📄 Load Mangalyaan Mars Periapsis Pass (7 records)</button>
+                <button class="btn btn-secondary" onclick="loadSampleDataset('aditya-l1')">📄 Load Aditya-L1 Solar CME / X-Ray Flare Pass (7 records)</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- VIEW 5: FLIGHT LOGS & ANALYTICS -->
+        <!-- ============================================== -->
+        <section id="viewAnalytics" style="display:none; flex-direction:column; gap:20px;">
+          <div class="glass-panel" style="padding:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <h2 style="font-size:18px; font-weight:800; color:#fff;">Mission Flight Logs & Multi-Parameter Analytics</h2>
+              <p style="font-size:12px; color:var(--text-muted);">Cross-sensor correlation analysis, raw telemetry inspector & export</p>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary" onclick="exportTelemetryCsv()">📥 Export CSV</button>
+              <button class="btn btn-primary" onclick="exportMissionJson()">📄 Export Report JSON</button>
+            </div>
+          </div>
+
+          <!-- Raw Telemetry Table -->
+          <div class="glass-panel" style="padding:16px; overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Coordinates</th>
+                  <th>Altitude (km)</th>
+                  <th>Temp (°C)</th>
+                  <th>Radar (km)</th>
+                  <th>LiDAR (m)</th>
+                  <th>Signal (dBm)</th>
+                  <th>Data Source</th>
+                </tr>
+              </thead>
+              <tbody id="telemetryTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Footer -->
+        <footer style="margin-top:auto; padding-top:16px; border-top:1px solid rgba(56,189,248,0.15); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; font-size:11px; font-family:var(--font-mono); color:var(--text-muted);">
+          <div>ASTRA – Space Mission Explorer | Lightweight Edition (Zero-Bloat, Under 1 MB)</div>
+          <div>Honoring ISRO Chandrayaan, Mangalyaan & Aditya-L1</div>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <!-- Main Application Script -->
+  <script src="app.js"></script>
+</body>
+</html>
